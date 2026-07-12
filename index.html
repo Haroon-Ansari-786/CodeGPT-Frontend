@@ -1,1 +1,194 @@
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CodeGPT - Advanced</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Smooth scrolling aur scrollbar hide karne ke liye */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 10px; }
+        .typing-cursor::after {
+            content: '|';
+            animation: blink 1s step-start infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body class="bg-[#212121] text-gray-200 h-screen flex overflow-hidden font-sans">
+
+    <!-- Left Sidebar -->
+    <div class="w-64 bg-[#171717] flex flex-col hidden md:flex border-r border-gray-700">
+        <div class="p-4">
+            <button onclick="clearChat()" class="w-full flex items-center justify-center gap-2 bg-[#2f2f2f] hover:bg-[#3f3f3f] text-white py-3 rounded-lg transition-colors border border-gray-600">
+                <span>+</span> New chat
+            </button>
+        </div>
+        <div class="flex-1 overflow-y-auto p-4 space-y-2">
+            <p class="text-xs text-gray-500 font-bold mb-3">TODAY</p>
+            <div class="text-sm truncate p-2 hover:bg-[#2f2f2f] rounded cursor-pointer">Python API security...</div>
+        </div>
+        
+        <!-- Secure Token Input Area (GitHub par public HTML me token hardcode nahi kar sakte) -->
+        <div class="p-4 border-t border-gray-700">
+            <label class="text-xs text-gray-400 mb-1 block">API Access Token</label>
+            <input type="password" id="api-token" placeholder="Enter Token..." 
+                   class="w-full bg-[#2f2f2f] border border-gray-600 rounded p-2 text-sm text-white outline-none focus:border-blue-500">
+            <button onclick="saveToken()" class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 rounded transition">Save Securely</button>
+        </div>
+    </div>
+
+    <!-- Main Chat Area -->
+    <div class="flex-1 flex flex-col relative h-full">
+        
+        <!-- Header -->
+        <header class="h-14 flex items-center justify-center border-b border-gray-700 md:hidden bg-[#212121]">
+            <h1 class="text-lg font-semibold">CodeGPT</h1>
+        </header>
+
+        <!-- Chat Container -->
+        <div id="chat-container" class="flex-1 overflow-y-auto p-4 md:p-10 pb-32">
+            <div class="max-w-3xl mx-auto flex flex-col gap-6" id="chat-messages">
+                <!-- AI Greeting -->
+                <div class="flex gap-4">
+                    <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center font-bold text-white shrink-0">AI</div>
+                    <div class="mt-1 text-gray-300 leading-relaxed">
+                        Hello Mohammad Bhai! Main CodeGPT hun. Aapka system ready hai. Puchhiye kya code likhna hai?
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Input Box Area -->
+        <div class="absolute bottom-0 left-0 w-full bg-gradient-to-t from-[#212121] via-[#212121] to-transparent pt-10 pb-6 px-4 md:px-0">
+            <div class="max-w-3xl mx-auto relative flex items-center">
+                <textarea id="user-input" rows="1" placeholder="Send a message..." 
+                          class="w-full bg-[#2f2f2f] text-white rounded-xl pl-4 pr-12 py-3.5 resize-none outline-none focus:ring-1 focus:ring-gray-500 shadow-lg border border-gray-600"></textarea>
+                <button onclick="sendMessage()" class="absolute right-3 p-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white transition-colors">
+                    &#x27A4; <!-- Send Icon -->
+                </button>
+            </div>
+            <div class="text-center text-xs text-gray-500 mt-3">
+                CodeGPT Advanced System - Secure Local Execution
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const tokenInput = document.getElementById('api-token');
+
+        // Load token from local storage on startup
+        window.onload = () => {
+            if(localStorage.getItem('my_api_token')) {
+                tokenInput.value = localStorage.getItem('my_api_token');
+            }
+        };
+
+        function saveToken() {
+            localStorage.setItem('my_api_token', tokenInput.value);
+            alert("Token browser me securely save ho gaya!");
+        }
+
+        // Enter press karne par message send ho
+        userInput.addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            const token = localStorage.getItem('my_api_token');
+
+            if (!message) return;
+            if (!token) {
+                alert("Pehle left sidebar me apna API Token dalein aur Save karein!");
+                return;
+            }
+
+            // User Message UI me add karna
+            appendMessage(message, 'user');
+            userInput.value = '';
+
+            // AI ka placeholder (Typing effect ke liye)
+            const aiMessageElement = appendMessage('', 'ai');
+            
+            try {
+                // Request to Local Python Backend
+                const response = await fetch("http://127.0.0.1:5000/chat", {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}` // Secure token header
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const data = await response.json();
+                
+                if(response.status !== 200) {
+                    typeWriterEffect(aiMessageElement, "Error: " + data.reply);
+                } else {
+                    typeWriterEffect(aiMessageElement, data.reply);
+                }
+            } catch (error) {
+                typeWriterEffect(aiMessageElement, "Connection Error: Server (app.py) Termux me chalu nahi hai ya Token galat hai.");
+            }
+        }
+
+        function appendMessage(text, sender) {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex gap-4 ${sender === 'user' ? 'flex-row-reverse' : ''}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = `w-8 h-8 rounded-full flex items-center justify-center font-bold text-white shrink-0 ${sender === 'user' ? 'bg-gray-600' : 'bg-blue-600'}`;
+            avatar.innerText = sender === 'user' ? 'U' : 'AI';
+
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `mt-1 text-gray-300 leading-relaxed max-w-[80%] ${sender === 'user' ? 'bg-[#2f2f2f] px-4 py-2 rounded-2xl rounded-tr-sm' : ''}`;
+            msgDiv.innerText = text;
+
+            wrapper.appendChild(avatar);
+            wrapper.appendChild(msgDiv);
+            chatMessages.appendChild(wrapper);
+            
+            scrollToBottom();
+            return msgDiv;
+        }
+
+        // ChatGPT Jaisa Typing Effect
+        function typeWriterEffect(element, text) {
+            element.innerText = '';
+            element.classList.add('typing-cursor');
+            let i = 0;
+            const speed = 15; // Typing speed (ms)
+            
+            function type() {
+                if (i < text.length) {
+                    element.innerHTML += text.charAt(i);
+                    i++;
+                    scrollToBottom();
+                    setTimeout(type, speed);
+                } else {
+                    element.classList.remove('typing-cursor');
+                }
+            }
+            type();
+        }
+
+        function scrollToBottom() {
+            const container = document.getElementById('chat-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function clearChat() {
+            chatMessages.innerHTML = '';
+        }
+    </script>
+</body>
+</html>
